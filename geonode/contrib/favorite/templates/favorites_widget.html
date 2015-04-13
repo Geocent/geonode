@@ -1,0 +1,44 @@
+{% load mapstory_tags %}
+
+{% if favorites %}
+<h4>Favorites</h4>
+<ul>
+{% for f in favorites %}
+    <li>
+        <a title='Click to remove' class="rm-favorite btn btn-mini" href="{% url delete_favorite f.pk %}"><i class="icon-remove"></i></a>
+        <a href="{{ f.content_object.get_absolute_url }}">{{ f.content_object.title }}{{ f.content_object.get_profile.display_name }}</a>
+    </li>
+{% endfor %}
+</ul>
+{% endif %}
+
+{% if in_progress_maps %}
+<h4>MapStories In Progress</h4>
+<ul>
+{% for f in in_progress_maps %}
+    <li>
+        <a href="{{ f.get_absolute_url }}">{{ f.title }}</a>
+    </li>
+{% endfor %}
+</ul>
+{% endif %}
+
+{% if in_progress_layers %}
+<h4>StoryLayers In Progress</h4>
+<ul>
+{% for f in in_progress_layers %}
+    <li>
+        <a href="{{ f.get_absolute_url }}">{{ f.title }}</a>
+    </li>
+{% endfor %}
+</ul>
+{% endif %}
+
+<div id="confirm-delete" class="hide alert alert-warn" style="padding:10px; margin: 10px 0;">
+    Are you sure you want to delete this from your favorites?
+    <div style="margin: 5px 0">
+    <a href="#y" class="btn btn-danger">Delete</a>
+    <a href="#n" class="btn">Cancel</a>
+    </div>
+    <a href="#yy" style="font-weight:normal">Delete, and don't ask me again.</a>
+</div>
