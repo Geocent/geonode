@@ -158,6 +158,9 @@ class CommonModelApi(ModelResource):
         # Region filter
         regions = parameters.getlist("regions__name__in")
 
+        # Owner filters
+        owner = parameters.getlist("owner__username__in")
+
         # Sort order
         sort = parameters.get("order_by", "relevance")
 
@@ -252,15 +255,21 @@ class CommonModelApi(ModelResource):
                     SearchQuerySet() if sqs is None else sqs).filter_or(
                     regions_exact=region)
 
+        # filter by owner
+        if owner:
+            sqs = (
+                SearchQuerySet() if sqs is None else sqs).narrow(
+                    "owner__username:%s" % ','.join(map(str, owner)))
+
         # filter by date
         if date_start:
             sqs = (SearchQuerySet() if sqs is None else sqs).filter(
-                SQ(modified__gte=date_start)
+                SQ(date__gte=date_start)
             )
 
         if date_end:
             sqs = (SearchQuerySet() if sqs is None else sqs).filter(
-                SQ(modified__lte=date_end)
+                SQ(date__lte=date_end)
             )
 
         # Filter by geographic bounding box
@@ -277,10 +286,10 @@ class CommonModelApi(ModelResource):
         # Apply sort
         if sort.lower() == "-date":
             sqs = (
-                SearchQuerySet() if sqs is None else sqs).order_by("-modified")
+                SearchQuerySet() if sqs is None else sqs).order_by("-date")
         elif sort.lower() == "date":
             sqs = (
-                SearchQuerySet() if sqs is None else sqs).order_by("modified")
+                SearchQuerySet() if sqs is None else sqs).order_by("date")
         elif sort.lower() == "title":
             sqs = (SearchQuerySet() if sqs is None else sqs).order_by(
                 "title_sortable")
@@ -292,7 +301,7 @@ class CommonModelApi(ModelResource):
                 "-popular_count")
         else:
             sqs = (
-                SearchQuerySet() if sqs is None else sqs).order_by("-modified")
+                SearchQuerySet() if sqs is None else sqs).order_by("-date")
 
         return sqs
 
@@ -317,7 +326,7 @@ class CommonModelApi(ModelResource):
             # Do the query using the filterset and the query term. Facet the
             # results
             if len(filter_set) > 0:
-                sqs = sqs.filter(oid__in=filter_set_ids).facet('type').facet('subtype').facet('owner')\
+                sqs = sqs.filter(id__in=filter_set_ids).facet('type').facet('subtype').facet('owner')\
                     .facet('keywords').facet('regions').facet('category')
             else:
                 sqs = None
@@ -368,10 +377,15 @@ class CommonModelApi(ModelResource):
                     "total_count": total_count,
                     "facets": facets,
                     },
-            'objects': map(lambda x: x.get_stored_fields(), objects),
+            'objects': map(lambda x: self.get_haystack_api_fields(x), objects),
         }
         self.log_throttled_access(request)
         return self.create_response(request, object_list)
+
+    def get_haystack_api_fields(self, haystack_object):
+        object_fields = dict((k, v) for k, v in haystack_object.get_stored_fields().items()
+                             if not re.search('_exact$|_sortable$', k))
+        return object_fields
 
     def get_list(self, request, **kwargs):
         """
