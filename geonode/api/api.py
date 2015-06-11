@@ -24,9 +24,11 @@ from django.core.serializers.json import DjangoJSONEncoder
 from tastypie.serializers import Serializer
 from tastypie import fields
 from tastypie.resources import ModelResource
-from tastypie.constants import ALL
+from tastypie.constants import ALL, ALL_WITH_RELATIONS
 from tastypie.utils import trailing_slash
 
+from geonode.people.models import Profile
+from django.db.models import Q
 
 FILTER_TYPES = {
     'layer': Layer,
@@ -162,6 +164,7 @@ class GroupResource(ModelResource):
     detail_url = fields.CharField()
     member_count = fields.IntegerField()
     manager_count = fields.IntegerField()
+    interests = fields.CharField(null=True, attribute='interests')
 
     def dehydrate_member_count(self, bundle):
         return bundle.obj.member_queryset().count()
@@ -172,16 +175,31 @@ class GroupResource(ModelResource):
     def dehydrate_detail_url(self, bundle):
         return reverse('group_detail', args=[bundle.obj.slug])
 
+    def dehydrate_interests(self, bundle):
+        return bundle.obj.interest_list()
+
     class Meta:
         queryset = GroupProfile.objects.all()
         resource_name = 'groups'
         allowed_methods = ['get']
         filtering = {
-            'name': ALL
+            'name': ALL,
+            'city': ALL,
+            'interests': ALL_WITH_RELATIONS,
         }
-        ordering = ['title', 'last_modified']
-
-
+        ordering = ['title', 'last_modified', 'date_joined']
+"""
+class FeaturedGroupResource(ModelResource):
+    class Meta:
+        queryset = GroupProfile.objects.all().filter(featured=True)
+        resource_name = 'featured'
+        allowed_methods = ['get']
+        filtering = {'name': ALL,
+                     'city': ALL,
+                     'interests': ALL_WITH_RELATIONS,
+                     }
+        ordering = ['title', 'last_modified', 'date_joined']
+"""
 class ProfileResource(ModelResource):
     """Profile api"""
 
@@ -193,6 +211,7 @@ class ProfileResource(ModelResource):
     documents_count = fields.IntegerField(default=0)
     current_user = fields.BooleanField(default=False)
     activity_stream_url = fields.CharField(null=True)
+    interests = fields.CharField(null=True, attribute='interests')
 
     def build_filters(self, filters={}):
         """adds filtering by group functionality"""
@@ -201,6 +220,10 @@ class ProfileResource(ModelResource):
 
         if 'group' in filters:
             orm_filters['group'] = filters['group']
+        if 'interest_list' in filters:
+            query = filters['interest_list']
+            qset = (Q(interests__slug__iexact=query))
+            orm_filters['interest_list'] = qset
 
         return orm_filters
 
@@ -208,6 +231,11 @@ class ProfileResource(ModelResource):
         """filter by group if applicable by group functionality"""
 
         group = applicable_filters.pop('group', None)
+
+        if 'interest_list' in applicable_filters:
+            interest_list = applicable_filters.pop('interest_list')
+        else:
+            interest_list = None
 
         semi_filtered = super(
             ProfileResource,
@@ -218,6 +246,8 @@ class ProfileResource(ModelResource):
         if group is not None:
             semi_filtered = semi_filtered.filter(
                 groupmember__group__slug=group)
+        if interest_list is not None:
+            semi_filtered = semi_filtered.filter(interest_list)
 
         return semi_filtered
 
@@ -259,6 +289,12 @@ class ProfileResource(ModelResource):
                     bundle.obj).pk,
                 'object_id': bundle.obj.pk})
 
+    def dehydrate_keyword_list(self, bundle):
+        return bundle.obj.keyword_list()
+
+    def dehydrate_interests(self, bundle):
+        return bundle.obj.interest_list()
+
     def prepend_urls(self):
         if settings.HAYSTACK_SEARCH:
             return [
@@ -289,10 +325,11 @@ class ProfileResource(ModelResource):
         return result
 
     class Meta:
-        queryset = get_user_model().objects.exclude(username='AnonymousUser')
+        #queryset = get_user_model().objects.exclude(username='AnonymousUser')
+        queryset = Profile.objects.exclude(username='AnonymousUser').exclude(username='admin')
         resource_name = 'profiles'
         allowed_methods = ['get']
-        ordering = ['username', 'date_joined', 'layers_count']
+        ordering = ['username', 'date_joined', 'layers_count', 'first_name']
         excludes = ['is_staff', 'password', 'is_superuser',
                     'is_active', 'last_login']
 
@@ -300,19 +337,3 @@ class ProfileResource(ModelResource):
             'username': ALL,
             'city': ALL,
         }
-
-#    def get_object_list(self, request):
-#        try:
-#            most_popular = request.GET['maps_count']
-#            obj_with_perms = get_objects_for_user(bundle.request.user,
-#                                              'base.view_resourcebase').instance_of(Map)
-#            result = super(ProfileResource, self).get_object_list(request).\
-#                annotate(maps_count=).order_by('maps_count')
-#        except:
-#            result = super(ProfileResource, self).get_object_list(request)
-#        return result
-
-#    def dehydrate_maps_count(self, bundle):
-#        obj_with_perms = get_objects_for_user(bundle.request.user,
-#                                              'base.view_resourcebase').instance_of(Map)
-#        return bundle.obj.resourcebase_set.filter(id__in=obj_with_perms.values('id')).distinct().count()

@@ -38,11 +38,17 @@ if 'notification' in settings.INSTALLED_APPS:
     from notification import models as notification
 
 #from geonode.base.models import ProfileBase
+from tastypie import fields
+from taggit.models import TaggedItemBase
+
+class TaggedInterests(TaggedItemBase):
+    content_object = models.ForeignKey('Profile')
 
 class Profile(AbstractUser):
-
     """Fully featured Geonode user"""
-
+    featured = models.BooleanField(default=False, help_text=_('Should this resource be advertised in home page?'))
+    interests = TaggableManager(_('interests'), blank=True, help_text=_(
+        'a list of personal interests'), through=TaggedInterests, related_name='profile_interests')
     organization = models.CharField(
         _('Organization Name'),
         max_length=255,
@@ -92,7 +98,7 @@ class Profile(AbstractUser):
         help_text=_('country of the physical address'))
     keywords = TaggableManager(_('keywords'), blank=True, help_text=_(
         'commonly used word(s) or formalised word(s) or phrase(s) used to describe the subject \
-            (space or comma-separated'))
+            (space or comma-separated'), related_name='profile_keywords')
 
     def get_absolute_url(self):
         return reverse('profile_detail', args=[self.username, ])
@@ -117,6 +123,12 @@ class Profile(AbstractUser):
         """
         return [kw.name for kw in self.keywords.all()]
 
+    def interest_list(self):
+        """
+        Returns a list of the Profile's interests.
+        """
+        return [interest.name for interest in self.interests.all()]
+
     @property
     def name_long(self):
         if self.first_name and self.last_name:
@@ -132,6 +144,17 @@ class Profile(AbstractUser):
     def location(self):
         return format_address(self.delivery, self.zipcode, self.city, self.area, self.country)
 
+class UserProfile(Profile):
+    whoahoho = models.TextField(
+        _('User Profile'),
+        null=True,
+        blank=True)
+
+class GroupProfile(Profile):
+    heyguys = models.TextField(
+        _('Group Profile'),
+        null=True,
+        blank=True)
 
 def get_anonymous_user_instance(Profile):
     return Profile(username='AnonymousUser')

@@ -460,7 +460,6 @@
 
     $scope.change_api = function(api_endpoint) {
       Configs.url = "/api/" + api_endpoint + "/";
-      console.log(Configs.url);
       $scope.query.limit = 100;
       $scope.query.offset = 0;
       return query_api($scope.query).then(function(result) {
@@ -473,16 +472,151 @@
     }
     
     $scope.calculate = function() {
-      $scope.calculate_most_popular_interest();
-      $scope.calculate_most_popular_location();
+      $scope.calculate_most_popular_interest2();
+      $scope.calculate_most_popular_location2();
     }
 
+    var location_promise = function() {
+      var highest = 1;
+      var popular = {};
+      // Query the users
+      Configs.url = '/api/profiles/';
+      $scope.query = {limit: 100, offset: 0};
+      return query_api($scope.query).then(function() {
+        var results = $scope.results;
+        results.forEach(function(element) {
+          if (popular[element.city] != null) {
+            popular[element.city]++;
+            if (highest < popular[element.city]) {
+              highest = popular[element.city];
+              $scope.most_popular_location = element.city;
+            }
+          } else {
+            if (element.city != "" && element.city != null) {
+              popular[element.city] = 1;
+              if (highest == 1) {
+                $scope.most_popular_location = element.city;
+              }
+            }
+          }
+        });
+        // Query the groups
+        Configs.url = '/api/groups/';
+        $scope.query = {limit: 100, offset: 0};
+        return query_api($scope.query).then(function() {
+          var results = $scope.results;
+          results.forEach(function(element) {
+            if (popular[element.city] != null) {
+              popular[element.city]++;
+              if (highest < popular[element.city]) {
+                highest = popular[element.city];
+                $scope.most_popular_location = element.city;
+              }
+            } else {
+              if (element.city != "" && element.city != null) {
+                popular[element.city] = 1;
+                if (highest == 1) {
+                  $scope.most_popular_location = element.city;
+                }
+              }
+            }
+          });
+          return results;
+        });
+      });
+    }
+
+    // Need to use both the users and groups api
+    $scope.calculate_most_popular_location2 = function() {
+      // Store the current api requests
+      var url = Configs.url;
+      var query = $scope.query;
+
+      // Calculate it and then return things to normal
+      location_promise().then(function() {
+        Configs.url = url;
+        $scope.query = query;
+        query_api($scope.query);
+      });
+    }
+
+    var interest_promise = function() {
+      var highest = 1;
+      var popular = {};
+      // Query the users
+      Configs.url = '/api/profiles/';
+      $scope.query = {limit: 100, offset: 0};
+      return query_api($scope.query).then(function() {
+        var results = $scope.results;
+        results.forEach(function(element) {
+          if (element.interests != null) {
+            element.interests.forEach(function(interest) {
+              if (popular[interest] != null) {
+                popular[interest]++;
+                if (highest < popular[interest]) {
+                  highest = popular[interest]
+                  $scope.most_popular_interest = interest;
+                }
+              } else {
+                if (interest != "" && interest != null) {
+                  popular[interest] = 1;
+                  if (highest == 1) {
+                    $scope.most_popular_interest = interest;
+                  }
+                }
+              }
+            });
+          }
+        });
+        // Query the groups
+        Configs.url = '/api/groups/';
+        $scope.query = {limit: 100, offset: 0};
+        return query_api($scope.query).then(function() {
+          var results = $scope.results;
+          results.forEach(function(element) {
+            if (element.interests != null) {
+              element.interests.forEach(function(interest) {
+                if (popular[interest] != null) {
+                  popular[interest]++;
+                  if (highest < popular[interest]) {
+                    highest = popular[interest]
+                    $scope.most_popular_interest = interest;
+                  }
+                } else {
+                  if (interest != "" && interest != null) {
+                    popular[interest] = 1;
+                    if (highest == 1) {
+                      $scope.most_popular_interest = interest;
+                    }
+                  }
+                }
+              });
+            }
+          });
+          return results;
+        });
+      });      
+    }
+
+    $scope.calculate_most_popular_interest2 = function() {
+      // Store the current api requests
+      var url = Configs.url;
+      var query = $scope.query;
+
+      interest_promise().then(function() {
+        Configs.url = url;
+        $scope.query = query;
+        query_api($scope.query);
+      });
+    }
+
+    // TODO: Refactor these into one function
     // use the city field to determine this
     $scope.calculate_most_popular_location = function() {
       var highest = 1;
       var popular = {};
       var results = $scope.results;
-      // problem! this is using previous results for some reason...?
+
       results.forEach(function(element) {
         if (popular[element.city] != null) {
           popular[element.city]++;
@@ -491,17 +625,40 @@
             $scope.most_popular_location = element.city;
           }
         } else {
-          popular[element.city] = 1;
+          if (element.city != "") {
+            popular[element.city] = 1;
+            if (highest == 1) {
+              $scope.most_popular_location = element.city;
+            }
+          }
         }
       });
-      if (highest == 1) {
-        $scope.most_popular_location = results[0].city;
-      }
     }
 
-    // Currently can't implement this because interest is not a field
+    // use the interest field to determine this
     $scope.calculate_most_popular_interest = function() {
-      $scope.most_popular_interest = "MapStory";
+      var highest = 1;
+      var popular = {};
+      var results = $scope.results;
+
+      results.forEach(function(element) {
+        $scope.results.interests.forEach(function(interest) {
+          if (popular[interest] != null) {
+            popular[interest]++;
+            if (highest < popular[interest]) {
+              highest = popular[interest]
+              $scope.most_popular_interest = interest;
+            }
+          } else {
+            if (interest != "") {
+              popular[interest] = 1;
+              if (highest == 1) {
+                $scope.most_popular_interest = interest;
+              }
+            }
+          }
+        });
+      });
     }
 
     /*
